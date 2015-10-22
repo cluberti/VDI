@@ -1,0 +1,597 @@
+10/19/2015 5:27:40 PM REV 1 - Jeff Stokes
+
+
+' First things first - enable RDP Connections!!! 
+RunWait "WMIC rdtoggle where AllowTSConnections=0 call SetAllowTSConnections 1,1" 
+RunWait "netsh advfirewall firewall set rule group=" & Chr(34) & "remote desktop" & Chr(34) & " new enable=Yes"
+
+Comment:  We enable RDP so you can connect to the host in a VDI environment over MSTSC.
+
+ 
+
+' Disable Adaptive Brightness Service 
+RunWait "sc config SensrSvc start= disabled"
+
+Comment:  We disable adaptive brightness as it does not apply to a Virtual Guest and is considered operational overhead.
+
+ 
+
+' Disable Application Layer Gateway Service 
+RunWait "sc config ALG start= disabled"
+
+Comment:  ALG is used for 3rd Party Plug-ins to ICS, which we would assume you are not using in a virtual desktop environment…
+
+ 
+
+' Disable Background Intelligent Transfer Service 
+RunWait "sc config BITS start= disabled"
+
+Comment:  We disable BITS because we are assuming a short lifespan for the guest OS.  If you are running a persistent virtual desktop infrastructure that is updated with SCCM or WSUS then this may need to be enabled.
+
+' Disable Background Layout Service 
+oShell.RegWrite "HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\OptimalLayout\EnableLayout", 0, "REG_DWORD"
+
+Comment:  This setting governs if Windows will optimize the disk during periods of idleness.  In a non-persistent VDI environment, this setting makes no sense.  In a persistent VDI environment, it may make some sense, depending on the backend disk infrastructure.  Maybe.
+
+' Disable Bitlocker Drive Encryption Service 
+RunWait "sc config BDESVC start= disabled"
+
+Comment:  We are assuming that the individual VMs will not be bitlockered and if disk encryption is necessary, that it is implemented in the disk storage environment where the VHD files are stored.
+
+' Disable Block Level Backup Engine Service 
+RunWait "sc config wbengine start= disabled"
+
+Comment:  It would be unusual to need to backup a VDI environment where typically applications are streamed, VMs are thrown away after one use, and/or user data is stored using UE-V and folder redirection.
+
+' Disable Bluetooth Support Service 
+RunWait "sc config bthserv start= disabled"
+
+Comment:  This MAY break some third party printer drivers, to have this disabled.  Your mileage may vary.
+
+If strBranchCache = True Then 
+' Disable BranchCache Service 
+RunWait "sc config PeerDistSvc start= disabled" 
+End If
+
+Comment:  It would be an unusual VDI environment where BranchCache would be required or implemented.
+
+' Disable Computer Browser Service 
+RunWait "sc config Browser start= disabled"
+
+Comment:  It is unusual where company's have users browsing the network directly for nodes.
+
+' Disable Diagnostic Policy Service 
+RunWait "sc config DPS start= disabled"
+
+Comment:  If you rely on this for troubleshooting purposes you may want it enabled, but typically this service is disabled in corporate environments with no ill effect.
+
+' Disable Disk Defragmenter Service 
+RunWait "schtasks /change /tn ""microsoft\windows\defrag\ScheduledDefrag"" /disable" 
+oShell.RegWrite "HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Dfrg\BootOptimizeFunction\Enable", "N", "REG_SZ" 
+RunWait "sc config defragsvc start= disabled"
+
+Comment:  These settings disable the defragmentation scheduled task, the service, and the boot optimizer as well.  We are assuming the environment is non-persistent.  Defrag MAY make sense in a persistent virtual environment, depending on disk backend setup.
+
+' Disable Distributed Link Tracking Service 
+RunWait "sc stop TrkWks" 
+RunWait "sc config TrkWks start= disabled"
+
+Comment:  This service maintains links between NTFS files in a computer or across computers.  It is unusual to see a client (or server for that matter) rely upon this process for data handling.  In our experience it may be safely disabled but you should of course test 3rd party applications for compatibility.
+
+If strEFS = True Then 
+' Disable Encrypting File System Service 
+RunWait "sc config EFS start= disabled" 
+End If
+
+Comment:  This is disabled because again, if you want disk encryption, you should rely upon a larger scale solution than Bitlockering individual VMs or using EFS for individual Files.
+
+' Disable Function Discovery Resource Publication Service 
+RunWait "sc config fdPHost start= disabled"
+
+Comment:  Disabling this cuts down on network chatter.  In corporate environments we don’t recommend running SSDP, which relies upon this service.  It does disable WS-D, which MAY be needed in your environment, but we’ve found those situations to be fairly remote.
+
+' Disable HomeGroup Listener Service 
+RunWait "sc config HomeGroupListener start= disabled"
+
+Comment:  It would be very unlikely that a virtual machine would be a HomeGroup participant.
+
+' Disable HomeGroup Provider Service 
+RunWait "sc config HomeGroupProvider start= disabled"
+
+Comment:  It would be very unlikely that a virtual machine would be a HomeGroup participant.
+
+If striSCSI = True Then 
+' Disable Microsoft iSCSI Provider Service 
+RunWait "sc config msiscsi start= disabled" 
+End If
+
+Comment:  You MAY want iSCSI enabled for VDI to provision a disk for, well, some reason I cannot come up with currently.  Typically we disable this.
+
+' Disable Microsoft Software Shadow Copy Provider Service 
+RunWait "sc config swprv start= disabled"
+
+Comment:  We feel in a VDI environment, the disk overhead of having and creating VS Snapshots is unneeded.  If the VM fails, recreate it.  All user data should be stored off the VM.
+
+' Disable Parental Controls Service 
+RunWait "sc config WPCSvc start= disabled"
+
+Comment:  It is unlikely in a corporate environment this would be needed….
+
+' Disable Secure Socket Tunneling Protocol Service 
+RunWait "sc config SstpSvc start= disabled"
+
+Comment:  This could be needed if you were remote tunneling to servers from the VM.  But in most end-user cases this is ok to disable.
+
+' Disable Shell Hardware Detection Service 
+RunWait "sc config ShellHWDetection start= disabled"
+
+Comment:  Hopefully in your virtual machine environment you are not relying on autoplay for anything.
+
+' Disable SNMP Trap Service 
+RunWait "sc config SNMPTRAP start= disabled"
+
+Comment:  You could enable this for monitoring via SNMP, but likely you aren’t and this is ok to disable.
+
+' Disable Superfetch Service 
+oShell.RegWrite "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management\PrefetchParameters\EnablePrefetcher", &H00000000, "REG_DWORD" 
+oShell.RegWrite "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management\PrefetchParameters\EnableSuperfetch", &H00000000, "REG_DWORD" 
+RunWait "sc stop SysMain" 
+RunWait "sc config SysMain start= disabled"
+
+Comment:  We created this script with the idea that instead of patching VMs, folks would (even in a persistent VM environment) just deploy new pristine images rather than patch and service VMs over time.  Or not persist the VM past the end of a user session at all.  With that in mind, this service does nothing except generate disk IO load for the individual VM.
+
+' Disable SSDP Discovery Service 
+RunWait "sc stop SSDPSRV" 
+RunWait "sc config SSDPSRV start= disabled"
+
+Comment:  SSDP should probably not be relied upon in a corporate environment for device discovery.
+
+' Disable Tablet PC Input Service 
+RunWait "sc config TabletInputService start= disabled"
+
+Comment:  Unless your VM is being fronted by a tablet this is a service that you would not need.
+
+' Disable Telephony Service 
+RunWait "sc config TapiSrv start= disabled"
+
+Comment:  This service is rarely used in VDI, but if you need it, enable it.
+
+' Disable TPM Base Services Service 
+RunWait "sc config TBS start= disabled"
+
+Comment:  A VM has no access to the TPM chip of a server, so we can disable this service.
+
+' Disable UPnP Device Host Service 
+RunWait "sc config upnphost start= disabled"
+
+Comment:  Hopefully your corporate LAN/WAN does not rely upon uPnP for port servicing of the firewall(s).
+
+' Disable Windows Backup Service 
+RunWait "sc config SDRSVC start= disabled"
+
+Comment:  We advise you to not allow users to store data on a VM but use folder redirection to corral user data.  With that in mind, backups are not needed.
+
+' Disable Windows CardSpace Service 
+RunWait "sc config idsvc start= disabled"
+
+Comment:  Some 3rd party applications may rely upon this but likely you can run with this disabled.
+
+' Disable Windows Color System Service 
+RunWait "sc config WcsPlugInService start= disabled"
+
+Comment:  This might be needed for 3rd party graphics programs, maybe…
+
+' Disable Windows Connect Now - Config Registrar Service 
+RunWait "sc config wcncsvc start= disabled"
+
+Comment:  Doubtful Windows VDI guests would need to do WPS.
+
+' Disable Windows Defender Service 
+RunWait "schtasks /change /tn ""microsoft\windows Defender\MPIdleTask"" /disable" 
+RunWait "schtasks /change /tn ""microsoft\windows Defender\MP Scheduled Scan"" /disable" 
+RunWait "sc stop WinDefend" 
+RunWait "sc config WinDefend start= disabled"
+
+Comment:  We are relying upon your AV vendor of choice to handle this work.
+
+' Disable Windows Error Reporting Service 
+RunWait "sc config WerSvc start= disabled"
+
+Comment:  Unless you are using WER harvesting in your environment somehow this is ok to disable.
+
+' Disable Windows Media Center Receiver Service 
+RunWait "sc config ehRecvr start= disabled"
+
+Comment:  This service is used for TV Tuners and FM Radio reception, probably not needed.
+
+' Disable Windows Media Center Scheduler Service 
+RunWait "sc config ehSched start= disabled"
+
+Comment:  This starts and stops recording of TV shows…
+
+' Disable Windows Media Player Network Sharing Service 
+RunWait "sc config WMPNetworkSvc start= disabled"
+
+Comment:  This is used to share Windows Media Player Libraries and likely not needed in a VDI environment.
+
+' Break out Windows Management Instrumentation Service 
+RunWait "winmgmt /standalonehost" 
+RunWait "sc config winmgmt group= COM Infrastructure"
+
+Comment:  No harm by doing this, some benefit in that if WMI becomes an issue, it will be easier and quicker to troubleshoot.
+
+'Disable Windows Search Service 
+If strSearch = True Then 
+    RunWait "sc stop WSearch" 
+    RunWait "sc config WSearch start= disabled" 
+End If
+
+Comment:  Disabling this completely will disable content indexing of files/email/etc.  When a VM boots up for the first few times, it will spend a lot of disk and CPU time indexing with this enabled.
+
+' Disable Wireless Zero Configuration Service 
+RunWait "sc config WZCSVC start= disabled"
+
+Comment:  Going on the assumption you aren’t using wireless in your VMs.
+
+' Disable WLAN AutoConfig Service 
+RunWait "sc config Wlansvc start= disabled"
+
+Comment:  See above.
+
+' Disable WWAN AutoConfig Service 
+RunWait "sc config WwanSvc start= disabled"
+
+Comment:  Assuming we aren’t using any WWAN devices in VDI.
+
+
+' // ================ 
+' // MACHINE SETTINGS 
+' // ================
+
+' Do you want users to have the ability to use Aero themes for their desktop when connecting? 
+' If so, leave these two services enabled.  Disabling these services will disable Aero and DWM, and 
+' thus disable the use of any Aero themes: 
+If strAero = True Then 
+    ' Disable Desktop Window Manager Session Manager Service 
+    RunWait "sc config UxSms start= disabled" 
+    ' Disable Themes Service 
+    RunWait "sc config Themes start= disabled" 
+End If
+
+Comment:  Script comments self explanatory
+
+
+' Disable Hard disk timeouts 
+RunWait "POWERCFG /SETACVALUEINDEX 381b4222-f694-41f0-9685-ff5bb260df2e 0012ee47-9041-4b5d-9b77-535fba8b1442 6738e2c4-e8a5-4a42-b16a-e040e769756e 0" 
+RunWait "POWERCFG /SETDCVALUEINDEX 381b4222-f694-41f0-9685-ff5bb260df2e 0012ee47-9041-4b5d-9b77-535fba8b1442 6738e2c4-e8a5-4a42-b16a-e040e769756e 0"
+
+Comment:  Increase the timeouts in the likely event storage takes too long at some point. 
+
+' Disable TCP/IP / Large Send Offload 
+oShell.RegWrite "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters\DisableTaskOffload", &H00000001, "REG_DWORD" 
+oShell.RegWrite "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\BNNS\Parameters\EnableOffload", &H00000000, "REG_DWORD"
+
+Comment:  Some Hyper-Visors do not allow access to the physical NIC for offloading.
+
+
+' Disable hibernate 
+RunWait "powercfg -h off"
+
+Comment:  We don’t need VMs hibernating typically.
+
+
+' Disable System Restore 
+Set objWMIService = GetObject("winmgmts:\\.\root\default") 
+Set objItem = objWMIService.Get("SystemRestore") 
+objItem.Disable("") 
+RunWait "schtasks /change /tn ""microsoft\windows\SystemRestore\SR"" /disable" 
+oShell.RegWrite "HKEY_LOCAL_MACHINE\Software\Microsoft\Windows NT\CurrentVersion\SystemRestore\DisableSR", &H00000001, "REG_DWORD"
+
+Comment:  Don’t need System Restore in most VDI environments.
+
+
+' Disable NTFS Last Access Timestamps 
+RunWait "FSUTIL behavior set disablelastaccess 1"
+
+Comment:  Disabling this will prevent Windows from writing to the file every time we read it.  This will help on io load.
+
+
+If strMachPass = True Then 
+    ' Disable Machine Account Password Changes 
+    oShell.RegWrite "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\Netlogon\Parameters\DisablePasswordChange", &H00000001, "REG_DWORD" 
+End If
+
+Comment:  If we have non-persistent VMs, we don’t need the Machine account to rotate passwords.
+
+
+' Disable memory dumps 
+oShell.RegWrite "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\CrashControl\CrashDumpEnabled", &H00000000, "REG_DWORD" 
+oShell.RegWrite "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\CrashControl\LogEvent", &H00000000, "REG_DWORD" 
+oShell.RegWrite "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\CrashControl\SendAlert", &H00000000, "REG_DWORD" 
+oShell.RegWrite "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\CrashControl\AutoReboot", &H00000001, "REG_DWORD"
+
+Comment:  In a non-persistent VM you won’t be able to collect the memory dump once it boots anyway.
+
+
+' Disable default system screensaver 
+oShell.RegWrite "HKEY_USERS\.DEFAULT\Control Panel\Desktop\ScreenSaveActive", 0, "REG_DWORD"
+
+Comment:  Leave enabled if you want a screensaver on the VM.  Better to implement this at the physical end-point though for CPU considerations.
+
+
+' Increase service startup timeouts 
+oShell.RegWrite "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\ServicesPipeTimeout", &H0002bf20, "REG_DWORD"
+
+Comment:  During a boot storm of many VMs it is likely you will time out the start of some services.  This change makes that acceptable.
+
+
+' Increase Disk I/O Timeout to 200 seconds. 
+oShell.RegWrite "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\Disk\TimeOutValue", &H000000C8, "REG_DWORD"
+
+Comment:  Increasing disk timeouts for boot storm and other saturation of disk I/O considerations.
+
+
+' Disable Other Scheduled Tasks 
+RunWait "schtasks /change /tn ""microsoft\windows\Application Experience\AitAgent"" /disable" 
+RunWait "schtasks /change /tn ""microsoft\windows\Application Experience\ProgramDataUpdater"" /disable" 
+RunWait "schtasks /change /tn ""microsoft\windows\Autochk\Proxy"" /disable" 
+RunWait "schtasks /change /tn ""microsoft\windows\Customer Experience Improvement Program\Consolidator"" /disable" 
+RunWait "schtasks /change /tn ""microsoft\windows\Customer Experience Improvement Program\KernelCeipTask"" /disable" 
+RunWait "schtasks /change /tn ""microsoft\windows\Customer Experience Improvement Program\UsbCeip"" /disable" 
+RunWait "schtasks /change /tn ""microsoft\windows\Diagnosis\Scheduled"" /disable" 
+RunWait "schtasks /change /tn ""microsoft\windows\DiskDiagnostic\Microsoft-Windows-DiskDiagnosticDataCollector"" /disable" 
+RunWait "schtasks /change /tn ""microsoft\windows\DiskDiagnostic\Microsoft-Windows-DiskDiagnosticResolver"" /disable" 
+RunWait "schtasks /change /tn ""microsoft\windows\Maintenance\WinSAT"" /disable" 
+RunWait "schtasks /change /tn ""microsoft\windows\MobilePC\HotStart"" /disable" 
+RunWait "schtasks /change /tn ""microsoft\windows\Power Efficiency Diagnostic\AnalyzeSystem"" /disable" 
+RunWait "schtasks /change /tn ""microsoft\windows\RAC\RacTask"" /disable" 
+RunWait "schtasks /change /tn ""microsoft\windows\Ras\MobilityManager"" /disable" 
+RunWait "schtasks /change /tn ""microsoft\windows\Registry\RegIdleBackup"" /disable" 
+RunWait "schtasks /change /tn ""microsoft\windows\SideShow\AutoWake"" /disable" 
+RunWait "schtasks /change /tn ""microsoft\windows\SideShow\GadgetManager"" /disable" 
+RunWait "schtasks /change /tn ""microsoft\windows\SideShow\SessionAgent"" /disable" 
+RunWait "schtasks /change /tn ""microsoft\windows\SideShow\SystemDataProviders"" /disable" 
+RunWait "schtasks /change /tn ""microsoft\windows\WDI\ResolutionHost"" /disable" 
+RunWait "schtasks /change /tn ""microsoft\windows\Windows Filtering Platform\BfeOnServiceStartTypeChange"" /disable" 
+RunWait "schtasks /change /tn ""microsoft\windows\Windows Media Sharing\UpdateLibrary"" /disable" 
+RunWait "schtasks /change /tn ""microsoft\windows\Windows Backup\ConfigNotification"" /disable"
+
+Comment:  Disable a bunch of scheduled tasks we likely don’t need in a virtual environment.
+
+
+' Configure Event Logs to 1028KB (Minimum size under Vista/7) and set retention to "overwrite" 
+Set oEventLogs = GetObject("winmgmts:{impersonationLevel=impersonate,(Security)}!//./root/cimv2").InstancesOf("Win32_NTEventLogFile") 
+For Each e in oEventLogs 
+    e.MaxFileSize = 1052672 
+    e.OverWritePolicy = "WhenNeeded" 
+    e.OverWriteOutdated = 0 
+    e.Put_ 
+    e.ClearEventLog() 
+Next
+
+oShell.RegWrite "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\eventlog\Application\Retention", 0, "REG_DWORD" 
+oShell.RegWrite "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\eventlog\Security\Retention", 0, "REG_DWORD" 
+oShell.RegWrite "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\eventlog\System\Retention", 0, "REG_DWORD"
+
+Comment:  Set event logs to 1024 KB and overwrite.  This is done so we don’t consume large amounts of disk space on logging we will never see in a non-persistent VM, or rarely need to see in a persistent VM.
+
+
+' Set PopUp Error Mode to "Neither" 
+oShell.RegWrite "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Windows\ErrorMode", 2, "REG_DWORD"
+
+Comment:  Tell the Windows Error manager to not bother the end user.
+
+
+' Disable bootlog and boot animation 
+RunWait "bcdedit /set {default} bootlog no" 
+RunWait "bcdedit /set {default} quietboot yes"
+
+Comment:  Speeds up boot slightly.
+
+
+' Disable UAC secure desktop prompt 
+oShell.RegWrite "HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Policies\System\PromptOnSecureDesktop", &H00000000, "REG_DWORD"
+
+Comment:  This will force the UAC prompts to the users session.
+
+
+' Disable New Network dialog 
+RunWait "reg add HKLM\SYSTEM\CurrentControlSet\Control\Network\NewNetworkWindowOff"
+
+Comment:  Very unlikely we would be presented with a new network.
+
+
+' Disable AutoUpdate of drivers from WU 
+oShell.RegWrite "HKEY_LOCAL_MACHINE\Software\Policies\Microsoft\Windows\DriverSearching\searchorderConfig", 0, "REG_DWORD"
+
+Comment:  Disable Windows Updates.  We want a strong managed single ‘gold’ image of Windows that we boot from, new and fresh every month.
+
+
+' Turn off Windows Gadget Platform, Media Center, Tablet PC Components, Windows DVD Maker, and Windows SideShow 
+RunWait "dism /online /Disable-Feature /FeatureName:WindowsGadgetPlatform /NoRestart" 
+RunWait "dism /online /Disable-Feature /FeatureName:MediaCenter /NoRestart" 
+RunWait "dism /online /Disable-Feature /FeatureName:TabletPCOC /NoRestart" 
+RunWait "dism /online /Disable-Feature /FeatureName:OpticalMediaDisc /NoRestart" 
+oShell.RegWrite "HKEY_LOCAL_MACHINE\Software\Policies\Microsoft\Windows\Sideshow\Disabled", 1, "REG_DWORD"
+
+Comment:  No DVD on a VM, don’t need slideshow, or the other items, in a typical VM.  Unless your enterprise is using gadgets.
+
+
+' Disable IE First Run Wizard and RSS Feeds 
+oShell.RegWrite "HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Internet Explorer\Main\DisableFirstRunCustomize", 1, "REG_DWORD"
+
+Comment:  Make things easier on the end user
+
+
+' Disable the ability to clear the paging file during shutdown 
+oShell.RegWrite "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\SessionManager\Memory Management\ClearPageFileAtShutdown", 0, "REG_DWORD"
+
+Comment:  This causes a long delay at shutdown and shouldn’t be necessary in a secure data center VDI environment.
+
+
+' Perform a disk cleanup 
+' Automate by creating the reg checks corresponding to "cleanmgr /sageset:100" so we can use "sagerun:100" 
+oShell.RegWrite "HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Explorer\VolumeCaches\Active Setup Temp Folders\StateFlags0100", &H00000002, "REG_DWORD" 
+oShell.RegWrite "HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Explorer\VolumeCaches\Downloaded Program Files\StateFlags0100", &H00000002, "REG_DWORD" 
+oShell.RegWrite "HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Explorer\VolumeCaches\Internet Cache Files\StateFlags0100", &H00000002, "REG_DWORD" 
+oShell.RegWrite "HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Explorer\VolumeCaches\Memory Dump Files\StateFlags0100", &H00000002, "REG_DWORD" 
+oShell.RegWrite "HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Explorer\VolumeCaches\Offline Pages Files\StateFlags0100", &H00000002, "REG_DWORD" 
+oShell.RegWrite "HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Explorer\VolumeCaches\Old ChkDsk Files\StateFlags0100", &H00000002, "REG_DWORD" 
+oShell.RegWrite "HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Explorer\VolumeCaches\Previous Installations\StateFlags0100", &H00000000, "REG_DWORD" 
+oShell.RegWrite "HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Explorer\VolumeCaches\Recycle Bin\StateFlags0100", &H00000002, "REG_DWORD" 
+oShell.RegWrite "HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Explorer\VolumeCaches\Setup Log Files\StateFlags0100", &H00000002, "REG_DWORD" 
+oShell.RegWrite "HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Explorer\VolumeCaches\System error memory dump files\StateFlags0100", &H00000002, "REG_DWORD" 
+oShell.RegWrite "HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Explorer\VolumeCaches\System error minidump files\StateFlags0100", &H00000002, "REG_DWORD" 
+oShell.RegWrite "HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Explorer\VolumeCaches\Temporary Files\StateFlags0100", &H00000002, "REG_DWORD" 
+oShell.RegWrite "HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Explorer\VolumeCaches\Temporary Setup Files\StateFlags0100", &H00000002, "REG_DWORD" 
+oShell.RegWrite "HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Explorer\VolumeCaches\Thumbnail Cache\StateFlags0100", &H00000002, "REG_DWORD" 
+oShell.RegWrite "HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Explorer\VolumeCaches\Upgrade Discarded Files\StateFlags0100", &H00000000, "REG_DWORD" 
+oShell.RegWrite "HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Explorer\VolumeCaches\Windows Error Reporting Archive Files\StateFlags0100", &H00000002, "REG_DWORD" 
+oShell.RegWrite "HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Explorer\VolumeCaches\Windows Error Reporting Queue Files\StateFlags0100", &H00000002, "REG_DWORD" 
+oShell.RegWrite "HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Explorer\VolumeCaches\Windows Error Reporting System Archive Files\StateFlags0100", &H00000002, "REG_DWORD" 
+oShell.RegWrite "HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Explorer\VolumeCaches\Windows Error Reporting System Queue Files\StateFlags0100", &H00000002, "REG_DWORD" 
+oShell.RegWrite "HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Explorer\VolumeCaches\Windows Upgrade Log Files\StateFlags0100", &H00000002, "REG_DWORD" 
+RunWait "cleanmgr.exe /sagerun:100"
+
+Comment:  Cleaning up various files that aren’t needed to reduce disk footprint.
+
+ 
+
+' // ============= 
+' // USER SETTINGS 
+' // =============
+
+' Reduce menu show delay 
+oShell.RegWrite "HKEY_CURRENT_USER\Control Panel\Desktop\MenuShowDelay", "0", "REG_SZ"
+
+Comment:  Speed up Menu for the user.
+
+
+' Disable cursor blink 
+oShell.RegWrite "HKEY_CURRENT_USER\Control Panel\Desktop\CursorBlinkRate", "-1", "REG_SZ" 
+oShell.RegWrite "HKEY_CURRENT_USER\Control Panel\Desktop\DisableCursorBlink", &H00000001, "REG_DWORD"
+
+Comment:  Make the cursor always show.  If it blinks while they are connected remotely, network jitter and packet loss could hide the cursor temporarily.
+
+
+' Force off-screen composition in IE 
+oShell.RegWrite "HKEY_CURRENT_USER\Software\Microsoft\Internet Explorer\Main\Force Offscreen Composition", &H00000001, "REG_DWORD"
+
+Comment:  This is to help with rich video content rendering not flickering through terminal session.
+
+
+' Disable screensavers 
+oShell.RegWrite "HKEY_CURRENT_USER\Software\Policies\Microsoft\Windows\Control Panel\Desktop\ScreenSaveActive", "0", "REG_SZ" 
+oShell.RegWrite "HKEY_CURRENT_USER\Control Panel\Desktop\ScreenSaveActive", "0", "REG_SZ" 
+oShell.RegWrite "HKEY_USERS\.DEFAULT\Control Panel\Desktop\ScreenSaveActive", "0", "REG_SZ"
+
+Comment:  We don’t need screen savers on the VMs eating CPU.
+
+
+' Don't show window contents when dragging 
+oShell.RegWrite "HKEY_CURRENT_USER\Control Panel\Desktop\DragFullWindows", "0", "REG_SZ"
+
+Comment:  This reduces the video that needs to be rendered over network.
+
+
+' Don't show window minimize/maximize animations 
+oShell.RegWrite "HKEY_CURRENT_USER\Control Panel\Desktop\WindowMetrics\MinAnimate", "0", "REG_SZ"
+
+Comment:  See above
+
+
+' Disable font smoothing 
+oShell.RegWrite "HKEY_CURRENT_USER\Control Panel\Desktop\FontSmoothing", "0", "REG_SZ"
+
+Comment:  Reduces CPU load a little and shouldn’t be needed.
+
+
+' Disable most other visual effects 
+oShell.RegWrite "HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\VisualEffects\VisualFXSetting", &H00000003, "REG_DWORD" 
+oShell.RegWrite "HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced\ListviewAlphaSelect", &H00000000, "REG_DWORD" 
+oShell.RegWrite "HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced\TaskbarAnimations", &H00000000, "REG_DWORD" 
+oShell.RegWrite "HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced\ListviewWatermark", &H00000000, "REG_DWORD" 
+oShell.RegWrite "HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced\ListviewShadow", &H00000000, "REG_DWORD" 
+RegBinWrite "HKEY_CURRENT_USER\Control Panel\Desktop", "UserPreferencesMask", "90,12,01,80"
+
+Comment:  Trying to reduce the pain of working through a remote session for the user.
+
+
+' Disable Action Center 
+oShell.RegWrite "HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer\HideSCAHealth", &H00000001, "REG_DWORD"
+
+Comment:  Probably don’t need the action center bothering our users in a controlled environment.
+
+
+' Disable IE Persistent Cache 
+oShell.RegWrite "HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Internet Settings\Cache\Persistent", 0, "REG_DWORD" 
+oShell.RegWrite "HKEY_CURRENT_USER\Software\Microsoft\Feeds\SyncStatus", 0, "REG_DWORD"
+
+Comment:  Set cache to not persist.
+
+
+' Done 
+WScript.Quit
+
+ 
+
+ 
+
+
+' // ================ 
+' // HELPER FUNCTIONS 
+' // ================
+
+Function Run(sFile) 
+    Run = oShell.Run(sFile, 1, False) 
+End Function
+
+
+Function RunWait(sFile) 
+    RunWait = oShell.Run(sFile, 1, True) 
+End Function
+
+
+Function RunWaitHidden(sFile) 
+    RunWaitHidden = oShell.Run(sFile, 0, True) 
+End Function
+
+
+Function IsServer() 
+    IsServer = False 
+    On Error Resume Next 
+    For Each objOS in GetObject("winmgmts:").InstancesOf ("Win32_OperatingSystem") 
+        If objOS.ProductType = 1 Then IsServer = False 
+        If objOS.ProductType = 2 Or ObjOS.ProductType = 3 Then IsServer = True 
+    Next 
+End Function
+
+
+Sub RegBinWrite (key, value, data) 
+    key = "[" & key & "]"
+
+    If value <> "@" then 
+        value = chr(34) & value & chr(34) 
+    End if
+
+    valString = value & "=" & "hex:" & data
+
+    tempFile = GetTempDir() & "\regbinaryimport.reg" 
+    Set txtStream = oFSO.CreateTextFile(tempFile,true) 
+    txtStream.WriteLine("Windows Registry Editor Version 5.00") 
+    txtStream.WriteLine(key) 
+    txtStream.WriteLine(valString) 
+    txtStream.Close
+
+    oShell.Run "regedit.exe /s """ & tempFile & """", 1, true
+
+    oFSO.DeleteFile tempFile 
+End Sub
+
+
+Function GetTEMPDir() 
+    GetTEMPDir = oEnv("TEMP") 
+    If InStr(GetTEMPDir, "%") Then 
+        GetTEMPDir = oShell.ExpandEnvironmentStrings(GetTEMPDir) 
+    End If 
+End Function
