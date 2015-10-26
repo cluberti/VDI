@@ -35,8 +35,10 @@
     .\ConfigWin10asVDI.ps1 -NoWarn $true
 .NOTES
     Author:       Carl Luberti
-    Last Update:  16th October 2015
-    Version:      1.0
+    Last Update:  26th October 2015
+    Version:      1.0.1
+.LOG
+    1.0.1 - modified sc command to sc.exe to prevent PS from invoking set-content
 #>
 
 
