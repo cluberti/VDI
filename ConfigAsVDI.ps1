@@ -597,7 +597,7 @@ Write-Host ""
 
 Write-Host "Configuring Windows Update Service to run in standalone svchost..." -ForegroundColor Cyan
 Write-Host ""
-sc config wuauserv type= own
+sc.exe config wuauserv type= own
 Write-Host ""
 
 
