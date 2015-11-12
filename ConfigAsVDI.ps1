@@ -35,10 +35,11 @@
     .\ConfigWin10asVDI.ps1 -NoWarn $true
 .NOTES
     Author:       Carl Luberti
-    Last Update:  26th October 2015
-    Version:      1.0.1
+    Last Update:  12th November 2015
+    Version:      1.0.2
 .LOG
     1.0.1 - modified sc command to sc.exe to prevent PS from invoking set-content
+    1.0.2 - modified Universal Application section to avoid issues with CopyProfile, updated onedrive removal, updated for TH2
 #>
 
 
@@ -66,14 +67,10 @@ If ($NoWarn -eq $False)
     Write-Host "In other words, if you break it, you get to keep the pieces." -ForegroundColor Magenta
     Write-Host ""
     Write-Host ""
-    Write-Host "Press any key to continue ..." -ForegroundColor Yellow
-    Write-Host ""
-
-    $x = $host.UI.RawUI.ReadKey("NoEcho,IncludeKeyUp")
-    Write-Host ""
-    Write-Host ""
-    Write-Host ""
 }
+
+
+$ProgressPreference = SilentlyContinue"
 
 
 # Validate Windows 10 Enterprise:
@@ -88,7 +85,7 @@ If ($Edition.Edition -ne "Enterprise")
 
 # Configure Constants:
 $BranchCache = "False"
-$Cortana = "True"
+$Cortana = "False"
 $DiagService = "False"
 $EAPService = "False"
 $EFS = "False"
@@ -99,8 +96,8 @@ $MSSignInService = "True"
 $OneDrive = "True"
 $PeerCache = "False"
 $Search = "True"
-$SMB1 = "True"
-$SMBPerf = "True"
+$SMB1 = "False"
+$SMBPerf = "False"
 $Themes = "True"
 $Touch = "False"
 
@@ -124,8 +121,6 @@ New-PSDrive -Name HKU -PSProvider Registry -Root HKEY_USERS | Out-Null
 $Apps = Get-ProvisionedAppxPackage -Online
 
 
-
-
 # // ============
 # // Begin Config
 # // ============
@@ -147,11 +142,15 @@ If ($Install_NetFX3 -eq "True")
 }
 
 
-# Remove (Almost All) Inbox Start Screen Apps:
+# Remove (Almost All) Inbox Universal Apps:
 If ($StartApps -eq "False")
 {
-    Write-Host "Removing (most) built-in Start Screen Apps..." -ForegroundColor Yellow
+    Write-Host "Removing (most) built-in Universal Apps..." -ForegroundColor Yellow
     Write-Host ""
+    
+    Get-AppxPackage -AllUsers | Where-Object {$_.Name -like "king.com*"} | Remove-AppxPackage
+    Get-AppxPackage -AllUsers | Where-Object {$_.Name -like "*Twitter"} | Remove-AppxPackage
+    
     ForEach ($App in $Apps)
     {
         # News / Sports / Weather
@@ -263,12 +262,14 @@ If ($StartApps -eq "False")
             Remove-AppxPackage -Package $App.PackageName | Out-Null
         }
 
+        <#
         If ($App.DisplayName -eq "Microsoft.WindowsCalculator")
         {
             Write-Host "Removing Calculator Store App..." -ForegroundColor Yellow
             Remove-AppxProvisionedPackage -Online -PackageName $App.PackageName | Out-Null
             Remove-AppxPackage -Package $App.PackageName | Out-Null
         }
+        #>
 
         If ($App.DisplayName -eq "Microsoft.WindowsCamera")
         {
@@ -297,16 +298,37 @@ If ($StartApps -eq "False")
             Remove-AppxProvisionedPackage -Online -PackageName $App.PackageName | Out-Null
             Remove-AppxPackage -Package $App.PackageName | Out-Null
         }
+        
+        If ($App.DisplayName -eq "Microsoft.Office.Sway")
+        {
+            Write-Host "Removing Store App..." -ForegroundColor Yellow
+            Remove-AppxProvisionedPackage -Online -PackageName $App.PackageName | Out-Null
+            Remove-AppxPackage -Package $App.PackageName | Out-Null
+        }
+        
+        If ($App.DisplayName -eq "Microsoft.Messaging")
+        {
+            Write-Host "Removing Store App..." -ForegroundColor Yellow
+            Remove-AppxProvisionedPackage -Online -PackageName $App.PackageName | Out-Null
+            Remove-AppxPackage -Package $App.PackageName | Out-Null
+        }
+        
+        If ($App.DisplayName -eq "Microsoft.ConnectivityStore")
+        {
+            Write-Host "Removing Store App..." -ForegroundColor Yellow
+            Remove-AppxProvisionedPackage -Online -PackageName $App.PackageName | Out-Null
+            Remove-AppxPackage -Package $App.PackageName | Out-Null
+        }
     }
 
     Start-Sleep -Seconds 5
     Write-Host ""
     Write-Host ""
 
-    # Remove (the rest) Inbox Start Screen Apps:
+    # Remove (the rest of the) Inbox Universal Apps:
     If ($AllStartApps -eq "False")
     {
-        Write-Host "Removing (the rest of the) built-in Start Screen Apps..." -ForegroundColor Magenta
+        Write-Host "Removing (the rest of the) built-in Universal Apps..." -ForegroundColor Magenta
         Write-Host ""
         ForEach ($App in $Apps)
         {
@@ -320,6 +342,13 @@ If ($StartApps -eq "False")
             If ($App.DisplayName -eq "Microsoft.windowscommunicationsapps")
             {
                 Write-Host "Removing People, Mail, and Calendar Apps support..." -ForegroundColor Magenta
+                Remove-AppxProvisionedPackage -Online -PackageName $App.PackageName | Out-Null
+                Remove-AppxPackage -Package $App.PackageName | Out-Null
+            }
+            
+            If ($App.DisplayName -eq "Microsoft.CommsPhone")
+            {
+                Write-Host "Removing Store App..." -ForegroundColor Yellow
                 Remove-AppxProvisionedPackage -Online -PackageName $App.PackageName | Out-Null
                 Remove-AppxPackage -Package $App.PackageName | Out-Null
             }
@@ -351,13 +380,17 @@ If ($Cortana -eq "False")
 # Remove OneDrive:
 If ($OneDrive -eq "False")
 {
+    # Remove OneDrive (not guaranteed to be permanent - see https://support.office.com/en-US/article/Turn-off-or-uninstall-OneDrive-f32a17ce-3336-40fe-9c38-6efb09f944b0):
     Write-Host "Removing OneDrive..." -ForegroundColor Yellow
     C:\Windows\SysWOW64\OneDriveSetup.exe /uninstall
     Start-Sleep -Seconds 30
+    New-Item -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\' -Name 'Skydrive' | Out-Null
+    New-ItemProperty -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\Skydrive' -Name 'DisableFileSync' -PropertyType DWORD -Value '1' | Out-Null
+    New-ItemProperty -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\Skydrive' -Name 'DisableLibrariesDefaultSaveToSkyDrive' -PropertyType DWORD -Value '1' | Out-Null 
     Remove-Item -Path 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\FolderDescriptions\{A52BBA46-E9E1-435f-B3D9-28DAA648C0F6}' -Recurse
     Remove-Item -Path 'HKLM:\SOFTWARE\Wow6432Node\Microsoft\Windows\CurrentVersion\Explorer\FolderDescriptions\{A52BBA46-E9E1-435f-B3D9-28DAA648C0F6}' -Recurse
     Set-ItemProperty -Path 'HKCR:\CLSID\{018D5C66-4533-4307-9B53-224DE2ED1FE6}' -Name 'System.IsPinnedToNameSpaceTree' -Value '0'
-    Set-ItemProperty -Path 'HKCR:\Wow6432Node\CLSID\{018D5C66-4533-4307-9B53-224DE2ED1FE6}' -Name 'System.IsPinnedToNameSpaceTree' -Value '0'
+    Set-ItemProperty -Path 'HKCR:\Wow6432Node\CLSID\{018D5C66-4533-4307-9B53-224DE2ED1FE6}' -Name 'System.IsPinnedToNameSpaceTree' -Value '0' 
 }
 
 
