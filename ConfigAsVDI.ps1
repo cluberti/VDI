@@ -150,7 +150,9 @@ If ($StartApps -eq "False")
     Write-Host "Removing (most) built-in Universal Apps..." -ForegroundColor Yellow
     Write-Host ""
     
+    Write-Host "Removing Candy Crush App..." -ForegroundColor Green
     Get-AppxPackage -AllUsers | Where-Object {$_.Name -like "king.com*"} | Remove-AppxPackage
+    Write-Host "Removing Twitter App..." -ForegroundColor Green
     Get-AppxPackage -AllUsers | Where-Object {$_.Name -like "*Twitter"} | Remove-AppxPackage
     
     ForEach ($App in $Apps)
