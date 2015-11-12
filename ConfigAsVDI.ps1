@@ -64,6 +64,7 @@ If ($NoWarn -eq $False)
     Write-Host ""
     Write-Host "This script is provided AS-IS - usage of this source assumes that you are at the very least familiar with PowerShell, and the tools used to create and debug this script." -ForegroundColor Yellow
     Write-Host ""
+    Write-Host ""
     Write-Host "In other words, if you break it, you get to keep the pieces." -ForegroundColor Magenta
     Write-Host ""
     Write-Host ""
@@ -71,6 +72,7 @@ If ($NoWarn -eq $False)
 
 
 $ProgressPreference = SilentlyContinue"
+$ErrorActionPreference = "SilentlyContinue"
 
 
 # Validate Windows 10 Enterprise:
