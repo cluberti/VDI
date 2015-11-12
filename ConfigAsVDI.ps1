@@ -305,21 +305,21 @@ If ($StartApps -eq "False")
         
         If ($App.DisplayName -eq "Microsoft.Office.Sway")
         {
-            Write-Host "Removing Store App..." -ForegroundColor Yellow
+            Write-Host "Removing Office Sway App..." -ForegroundColor Yellow
             Remove-AppxProvisionedPackage -Online -PackageName $App.PackageName | Out-Null
             Remove-AppxPackage -Package $App.PackageName | Out-Null
         }
         
         If ($App.DisplayName -eq "Microsoft.Messaging")
         {
-            Write-Host "Removing Store App..." -ForegroundColor Yellow
+            Write-Host "Removing Messaging App..." -ForegroundColor Yellow
             Remove-AppxProvisionedPackage -Online -PackageName $App.PackageName | Out-Null
             Remove-AppxPackage -Package $App.PackageName | Out-Null
         }
         
         If ($App.DisplayName -eq "Microsoft.ConnectivityStore")
         {
-            Write-Host "Removing Store App..." -ForegroundColor Yellow
+            Write-Host "Removing Connectivity Store helper App..." -ForegroundColor Yellow
             Remove-AppxProvisionedPackage -Online -PackageName $App.PackageName | Out-Null
             Remove-AppxPackage -Package $App.PackageName | Out-Null
         }
@@ -352,7 +352,7 @@ If ($StartApps -eq "False")
             
             If ($App.DisplayName -eq "Microsoft.CommsPhone")
             {
-                Write-Host "Removing Store App..." -ForegroundColor Yellow
+                Write-Host "Removing CommsPhone helper App..." -ForegroundColor Yellow
                 Remove-AppxProvisionedPackage -Online -PackageName $App.PackageName | Out-Null
                 Remove-AppxPackage -Package $App.PackageName | Out-Null
             }
