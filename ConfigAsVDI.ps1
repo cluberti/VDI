@@ -71,7 +71,7 @@ If ($NoWarn -eq $False)
 }
 
 
-$ProgressPreference = SilentlyContinue"
+$ProgressPreference = "SilentlyContinue"
 $ErrorActionPreference = "SilentlyContinue"
 
 
