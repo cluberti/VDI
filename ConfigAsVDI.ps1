@@ -35,11 +35,12 @@
     .\ConfigWin10asVDI.ps1 -NoWarn $true
 .NOTES
     Author:       Carl Luberti
-    Last Update:  12th November 2015
-    Version:      1.0.2
+    Last Update:  31st March 2016
+    Version:      1.0.3
 .LOG
     1.0.1 - modified sc command to sc.exe to prevent PS from invoking set-content
     1.0.2 - modified Universal Application section to avoid issues with CopyProfile, updated onedrive removal, updated for TH2
+    1.0.3 - modified Universal Application section to disable "Consumer Experience" features, modified scheduled tasks to align with 1511 and further version supportability
 #>
 
 
@@ -147,13 +148,14 @@ If ($Install_NetFX3 -eq "True")
 # Remove (Almost All) Inbox Universal Apps:
 If ($StartApps -eq "False")
 {
+    # Disable "Consumer Features" (aka downloading apps from the internet automatically)
+    New-Item -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\' -Name 'CloudContent' | Out-Null
+    New-ItemProperty -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\CloudContent' -Name 'DisableWindowsConsumerFeatures' -PropertyType DWORD -Value '1' | Out-Null
+    # Disable the "how to use Windows" contextual popups
+    New-ItemProperty -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\CloudContent' -Name 'DisableSoftLanding' -PropertyType DWORD -Value '1' | Out-Null 
+
     Write-Host "Removing (most) built-in Universal Apps..." -ForegroundColor Yellow
     Write-Host ""
-    
-    Write-Host "Removing Candy Crush App..." -ForegroundColor Green
-    Get-AppxPackage -AllUsers | Where-Object {$_.Name -like "king.com*"} | Remove-AppxPackage
-    Write-Host "Removing Twitter App..." -ForegroundColor Green
-    Get-AppxPackage -AllUsers | Where-Object {$_.Name -like "*Twitter"} | Remove-AppxPackage
     
     ForEach ($App in $Apps)
     {
@@ -643,14 +645,8 @@ Write-Host ""
 # Disable Scheduled Tasks:
 Write-Host "Disabling Scheduled Tasks..." -ForegroundColor Cyan
 Write-Host ""
-Disable-ScheduledTask -TaskName "\Microsoft\Windows\Application Experience\Microsoft Compatibility Appraiser" | Out-Null
-Disable-ScheduledTask -TaskName "\Microsoft\Windows\Application Experience\ProgramDataUpdater" | Out-Null
-Disable-ScheduledTask -TaskName "\Microsoft\Windows\Application Experience\StartupAppTask" | Out-Null
 Disable-ScheduledTask -TaskName "\Microsoft\Windows\Autochk\Proxy" | Out-Null
 Disable-ScheduledTask -TaskName "\Microsoft\Windows\Bluetooth\UninstallDeviceTask" | Out-Null
-Disable-ScheduledTask -TaskName "\Microsoft\Windows\Customer Experience Improvement Program\Consolidator" | Out-Null
-Disable-ScheduledTask -TaskName "\Microsoft\Windows\Customer Experience Improvement Program\KernelCeipTask" | Out-Null
-Disable-ScheduledTask -TaskName "\Microsoft\Windows\Customer Experience Improvement Program\UsbCeip" | Out-Null
 Disable-ScheduledTask -TaskName "\Microsoft\Windows\Diagnosis\Scheduled" | Out-Null
 Disable-ScheduledTask -TaskName "\Microsoft\Windows\DiskDiagnostic\Microsoft-Windows-DiskDiagnosticDataCollector" | Out-Null
 Disable-ScheduledTask -TaskName "\Microsoft\Windows\DiskDiagnostic\Microsoft-Windows-DiskDiagnosticResolver" | Out-Null
