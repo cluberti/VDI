@@ -524,7 +524,7 @@ Write-Host "Disabling Microsoft Software Shadow Copy Provider Service..." -Foreg
 Set-Service swprv -StartupType Disabled
 
 Write-Host "Disabling Microsoft Storage Spaces SMP Service..." -ForegroundColor Cyan
-Set-Service swprv -StartupType Disabled
+Set-Service smphost -StartupType Disabled
 
 Write-Host "Disabling Offline Files Service..." -ForegroundColor Cyan
 Set-Service CscService -StartupType Disabled
