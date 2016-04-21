@@ -502,9 +502,6 @@ Set-Service HomeGroupListener -StartupType Disabled
 Write-Host "Disabling Home Group Provider Service..." -ForegroundColor Cyan
 Set-Service HomeGroupProvider -StartupType Disabled
 
-Write-Host "Disabling Home Group Provider Service..." -ForegroundColor Cyan
-Set-Service HomeGroupProvider -StartupType Disabled
-
 Write-Host "Disabling Internet Connection Sharing (ICS) Service..." -ForegroundColor Cyan
 Set-Service SharedAccess -StartupType Disabled
 
