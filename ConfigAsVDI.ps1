@@ -15,6 +15,7 @@
     - Reboot the machine 6 times and wait 120 seconds after logging on before performing the next reboot (boot prefetch training)
     - Run disk defrag and optimize boot files: defrag c: /v /b
     - If using a dynamic virtual disk, use the vendor's utilities to perform a "shrink" operation
+    - If including antivirus software, do a full scan after a def update to hash the disk - should improve disk perf
 
     // ************* 
     // *  CAUTION  * 
@@ -35,13 +36,14 @@
     .\ConfigWin10asVDI.ps1 -NoWarn $true
 .NOTES
     Author:       Carl Luberti
-    Last Update:  21st April 2016
-    Version:      1.0.4
+    Last Update:  24th August 2016
+    Version:      1.0.5
 .LOG
     1.0.1 - modified sc command to sc.exe to prevent PS from invoking set-content
-    1.0.2 - modified Universal Application section to avoid issues with CopyProfile, updated onedrive removal, updated for TH2
-    1.0.3 - modified Universal Application section to disable "Consumer Experience" features, modified scheduled tasks to align with 1511 and further version supportability
+    1.0.2 - modified UWP Application section to avoid issues with CopyProfile, updated onedrive removal, updated for TH2
+    1.0.3 - modified UWP Application section to disable "Consumer Experience" features, modified scheduled tasks to align with 1511 and further version supportability
     1.0.4 - fixed duplicates / issues in service config
+    1.0.5 - updated applist for Win10 1607, moved some things out of the critical area (if you've run this before, please review!)
 #>
 
 
@@ -58,7 +60,7 @@ Param(
 
 
 # Throw caution (to the wind?) - show if NoWarn param is not passed, or passed as $false:
-If ($NoWarn -eq $False)
+If ($NoWarn -ne $True)
 {
     Write-Host "THIS SCRIPT MAKES CONSIDERABLE CHANGES TO THE DEFAULT CONFIGURATION OF WINDOWS." -ForegroundColor Yellow
     Write-Host ""
@@ -96,19 +98,19 @@ $EFS = "False"
 $FileHistoryService = "False"
 $iSCSI = "False"
 $MachPass = "True"
-$MSSignInService = "True"
-$OneDrive = "True"
+$MSSignInService = "False"
+$OneDrive = "False"
 $PeerCache = "False"
-$Search = "True"
+$Search = "False"
 $SMB1 = "False"
 $SMBPerf = "False"
-$Themes = "True"
+$Themes = "False"
 $Touch = "False"
 
 $StartApps = "False"
-$AllStartApps = "True"
+$StoreApps = "False"
 
-$Install_NetFX3 = "True"
+$Install_NetFX3 = "False"
 $NetFX3_Source = "D:\Sources\SxS"
 
 $RDPEnable = 1
@@ -146,8 +148,8 @@ If ($Install_NetFX3 -eq "True")
 }
 
 
-# Remove (Almost All) Inbox Universal Apps:
-If ($StartApps -eq "False")
+# Remove (Almost All) Inbox UWP Apps:
+If ($StartApps -eq "True")
 {
     # Disable "Consumer Features" (aka downloading apps from the internet automatically)
     New-Item -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\' -Name 'CloudContent' | Out-Null
@@ -155,7 +157,7 @@ If ($StartApps -eq "False")
     # Disable the "how to use Windows" contextual popups
     New-ItemProperty -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\CloudContent' -Name 'DisableSoftLanding' -PropertyType DWORD -Value '1' | Out-Null 
 
-    Write-Host "Removing (most) built-in Universal Apps..." -ForegroundColor Yellow
+    Write-Host "Removing (most) built-in UWP Apps..." -ForegroundColor Yellow
     Write-Host ""
     
     ForEach ($App in $Apps)
@@ -240,7 +242,31 @@ If ($StartApps -eq "False")
             Remove-AppxPackage -Package $App.PackageName | Out-Null
         }
 
+        If ($App.DisplayName -eq "Microsoft.Microsoft.XboxIdentityProvider")
+        {
+            Write-Host "Removing Xbox Identity Provider helper App..." -ForegroundColor Yellow
+            Remove-AppxProvisionedPackage -Online -PackageName $App.PackageName | Out-Null
+            Remove-AppxPackage -Package $App.PackageName | Out-Null
+        }
+
         # Others
+        <#
+        # This will remove Mail and Calendar, and the ability to manage Microsoft Accounts from UWP...
+        If ($App.DisplayName -eq "Microsoft.windowscommunicationsapps")
+        {
+            Write-Host "Removing People, Mail, and Calendar Apps support..." -ForegroundColor Yellow
+            Remove-AppxProvisionedPackage -Online -PackageName $App.PackageName | Out-Null
+            Remove-AppxPackage -Package $App.PackageName | Out-Null
+        }
+        #>
+
+        If ($App.DisplayName -eq "Microsoft.Office.OneNote")
+        {
+            Write-Host "Removing OneNote App..." -ForegroundColor Yellow
+            Remove-AppxProvisionedPackage -Online -PackageName $App.PackageName | Out-Null
+            Remove-AppxPackage -Package $App.PackageName | Out-Null
+        }
+
         If ($App.DisplayName -eq "Microsoft.3DBuilder")
         {
             Write-Host "Removing 3D Builder App..." -ForegroundColor Yellow
@@ -270,6 +296,7 @@ If ($StartApps -eq "False")
         }
 
         <#
+        # Note there's no Win32 Calc.exe app in Win10 by default unless LTSB, so you might need this...
         If ($App.DisplayName -eq "Microsoft.WindowsCalculator")
         {
             Write-Host "Removing Calculator Store App..." -ForegroundColor Yellow
@@ -299,6 +326,13 @@ If ($StartApps -eq "False")
             Remove-AppxPackage -Package $App.PackageName | Out-Null
         }
 
+        If ($App.DisplayName -eq "Microsoft.CommsPhone")
+        {
+            Write-Host "Removing Phone App..." -ForegroundColor Yellow
+            Remove-AppxProvisionedPackage -Online -PackageName $App.PackageName | Out-Null
+            Remove-AppxPackage -Package $App.PackageName | Out-Null
+        }
+
         If ($App.DisplayName -eq "Microsoft.WindowsSoundRecorder")
         {
             Write-Host "Removing Voice Recorder App..." -ForegroundColor Yellow
@@ -322,7 +356,28 @@ If ($StartApps -eq "False")
         
         If ($App.DisplayName -eq "Microsoft.ConnectivityStore")
         {
-            Write-Host "Removing Connectivity Store helper App..." -ForegroundColor Yellow
+            Write-Host "Removing Microsoft Wi-Fi App..." -ForegroundColor Yellow
+            Remove-AppxProvisionedPackage -Online -PackageName $App.PackageName | Out-Null
+            Remove-AppxPackage -Package $App.PackageName | Out-Null
+        }
+
+        If ($App.DisplayName -eq "Microsoft.OneConnect")
+        {
+            Write-Host "Removing Paid Wi-Fi/Cellular helper App..." -ForegroundColor Yellow
+            Remove-AppxProvisionedPackage -Online -PackageName $App.PackageName | Out-Null
+            Remove-AppxPackage -Package $App.PackageName | Out-Null
+        }
+
+        If ($App.DisplayName -eq "Microsoft.MicrosoftStickyNotes")
+        {
+            Write-Host "Removing Sticky Notes App..." -ForegroundColor Yellow
+            Remove-AppxProvisionedPackage -Online -PackageName $App.PackageName | Out-Null
+            Remove-AppxPackage -Package $App.PackageName | Out-Null
+        }
+
+        If ($App.DisplayName -eq "Microsoft.WindowsFeedbackHub")
+        {
+            Write-Host "Removing Feedback Hub App..." -ForegroundColor Yellow
             Remove-AppxProvisionedPackage -Online -PackageName $App.PackageName | Out-Null
             Remove-AppxPackage -Package $App.PackageName | Out-Null
         }
@@ -332,30 +387,31 @@ If ($StartApps -eq "False")
     Write-Host ""
     Write-Host ""
 
-    # Remove (the rest of the) Inbox Universal Apps:
-    If ($AllStartApps -eq "False")
+    # !!!!!!!!!!!!!!! Remove store-based UWP apps - do this with caution, you cannot get the store back without a reinstall of the OS !!!!!!!!!!!!!!!
+    If ($StoreApps -eq "True")
     {
-        Write-Host "Removing (the rest of the) built-in Universal Apps..." -ForegroundColor Magenta
+        Write-Host "Removing (the rest of the) built-in UWP Apps..." -ForegroundColor Magenta
         Write-Host ""
         ForEach ($App in $Apps)
         {
-            If ($App.DisplayName -eq "Microsoft.Office.OneNote")
+            If ($App.DisplayName -eq "Microsoft.DesktopAppInstaller")
             {
-                Write-Host "Removing OneNote App..." -ForegroundColor Magenta
+                Write-Host "Removing Desktop App Sideloading helper App..." -ForegroundColor Magenta
                 Remove-AppxProvisionedPackage -Online -PackageName $App.PackageName | Out-Null
                 Remove-AppxPackage -Package $App.PackageName | Out-Null
             }
 
-            If ($App.DisplayName -eq "Microsoft.windowscommunicationsapps")
+            # Helps apps like Skype UWP access the Camera, for instance
+            If ($App.DisplayName -eq "Microsoft.Appconnector")
             {
-                Write-Host "Removing People, Mail, and Calendar Apps support..." -ForegroundColor Magenta
+                Write-Host "Removing AppX/Services Connectivity helper App..." -ForegroundColor Red
                 Remove-AppxProvisionedPackage -Online -PackageName $App.PackageName | Out-Null
                 Remove-AppxPackage -Package $App.PackageName | Out-Null
             }
-            
-            If ($App.DisplayName -eq "Microsoft.CommsPhone")
+
+            If ($App.DisplayName -eq "Microsoft.StorePurchaseApp")
             {
-                Write-Host "Removing CommsPhone helper App..." -ForegroundColor Yellow
+                Write-Host "Removing Store Purchase helper App..." -ForegroundColor Red
                 Remove-AppxProvisionedPackage -Online -PackageName $App.PackageName | Out-Null
                 Remove-AppxPackage -Package $App.PackageName | Out-Null
             }
@@ -376,7 +432,7 @@ If ($StartApps -eq "False")
 
 # Disable Cortana:
 New-Item -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\' -Name 'Windows Search' | Out-Null
-If ($Cortana -eq "False")
+If ($Cortana -eq "True")
 {
     Write-Host "Disabling Cortana..." -ForegroundColor Yellow
     Write-Host ""
@@ -385,7 +441,7 @@ If ($Cortana -eq "False")
 
 
 # Remove OneDrive:
-If ($OneDrive -eq "False")
+If ($OneDrive -eq "True")
 {
     # Remove OneDrive (not guaranteed to be permanent - see https://support.office.com/en-US/article/Turn-off-or-uninstall-OneDrive-f32a17ce-3336-40fe-9c38-6efb09f944b0):
     Write-Host "Removing OneDrive..." -ForegroundColor Yellow
@@ -402,7 +458,7 @@ If ($OneDrive -eq "False")
 
 
 # Set PeerCaching to Disabled (0) or Local Network PCs only (1):
-If ($PeerCache -eq "False")
+If ($PeerCache -eq "True")
 {
     Write-Host "Disabling PeerCaching..." -ForegroundColor Yellow
     Write-Host ""
@@ -440,7 +496,7 @@ Set-Service BthHFSrv -StartupType Disabled
 Write-Host "Disabling Bluetooth Support Service..." -ForegroundColor Cyan
 Set-Service bthserv -StartupType Disabled
 
-If ($BranchCache -eq "False")
+If ($BranchCache -eq "True")
 {
     Write-Host "Disabling BranchCache Service..." -ForegroundColor Yellow
     Set-Service PeerDistSvc -StartupType Disabled
@@ -464,19 +520,19 @@ Set-Service WdiServiceHost -StartupType Disabled
 Write-Host "Disabling Diagnostic System Host Service..." -ForegroundColor Cyan
 Set-Service WdiSystemHost -StartupType Disabled
 
-If ($DiagService -eq "False")
+If ($DiagService -eq "True")
 {
     Write-Host "Disabling Diagnostics Tracking Service..." -ForegroundColor Yellow
     Set-Service DiagTrack -StartupType Disabled
 }
 
-If ($EFS -eq "False")
+If ($EFS -eq "True")
 {
     Write-Host "Disabling Encrypting File System Service..." -ForegroundColor Yellow
     Set-Service EFS -StartupType Disabled
 }
 
-If ($EAPService -eq "False")
+If ($EAPService -eq "True")
 {
     Write-Host "Disabling Extensible Authentication Protocol Service..." -ForegroundColor Yellow
     Set-Service Eaphost -StartupType Disabled
@@ -488,7 +544,7 @@ Set-Service Fax -StartupType Disabled
 Write-Host "Disabling Function Discovery Resource Publication Service..." -ForegroundColor Cyan
 Set-Service FDResPub -StartupType Disabled
 
-If ($FileHistoryService -eq "False")
+If ($FileHistoryService -eq "True")
 {
     Write-Host "Disabling File History Service..." -ForegroundColor Yellow
     Set-Service fhsvc -StartupType Disabled
@@ -506,13 +562,13 @@ Set-Service HomeGroupProvider -StartupType Disabled
 Write-Host "Disabling Internet Connection Sharing (ICS) Service..." -ForegroundColor Cyan
 Set-Service SharedAccess -StartupType Disabled
 
-If ($MSSignInService -eq "False")
+If ($MSSignInService -eq "True")
 {
     Write-Host "Disabling Microsoft Account Sign-in Assistant Service..." -ForegroundColor Yellow
     Set-Service wlidsvc -StartupType Disabled
 }
 
-If ($iSCSI -eq "False")
+If ($iSCSI -eq "True")
 {
     Write-Host "Disabling Microsoft iSCSI Initiator Service..." -ForegroundColor Yellow
     Set-Service MSiSCSI -StartupType Disabled
@@ -569,13 +625,13 @@ Set-Service WiaRpc -StartupType Disabled
 Write-Host "Disabling Telephony Service..." -ForegroundColor Cyan
 Set-Service TapiSrv -StartupType Disabled
 
-If ($Themes -eq "False")
+If ($Themes -eq "True")
 {
     Write-Host "Disabling Themes Service..." -ForegroundColor Yellow
     Set-Service Themes -StartupType Disabled
 }
 
-If ($Touch -eq "False")
+If ($Touch -eq "True")
 {
     Write-Host "Disabling Touch Keyboard and Handwriting Panel Service..." -ForegroundColor Yellow
     Set-Service TabletInputService -StartupType Disabled
@@ -605,7 +661,7 @@ Set-Service WMPNetworkSvc -StartupType Disabled
 Write-Host "Disabling Windows Mobile Hotspot Service..." -ForegroundColor Cyan
 Set-Service icssvc -StartupType Disabled
 
-If ($Search -eq "False")
+If ($Search -eq "True")
 {
     Write-Host "Disabling Windows Search Service..." -ForegroundColor Yellow
     Set-Service WSearch -StartupType Disabled
@@ -637,6 +693,18 @@ Write-Host ""
 Write-Host "Configuring Windows Update Service to run in standalone svchost..." -ForegroundColor Cyan
 Write-Host ""
 sc.exe config wuauserv type= own
+Write-Host ""
+
+
+# Configure WMI:
+Write-Host "Modifying WMI Configuration..." -ForegroundColor Green
+Write-Host ""
+$oWMI=get-wmiobject -Namespace root -Class __ProviderHostQuotaConfiguration
+$oWMI.MemoryPerHost=768*1024*1024
+$oWMI.MemoryAllHosts=1536*1024*1024
+$oWMI.put()
+Set-ItemProperty -Path HKLM:\SYSTEM\CurrentControlSet\Services\Winmgmt -Name 'Group' -Value 'COM Infrastructure'
+winmgmt /standalonehost
 Write-Host ""
 
 
@@ -698,7 +766,7 @@ Write-Host "Disabling NTFS Last Access Timestamps..." -ForegroundColor Yellow
 Write-Host ""
 FSUTIL behavior set disablelastaccess 1 | Out-Null
 
-If ($MachPass -eq "False")
+If ($MachPass -eq "True")
 {
     # Disable Machine Account Password Changes
     Write-Host "Disabling Machine Account Password Changes..." -ForegroundColor Yellow
@@ -742,7 +810,8 @@ Write-Host ""
 New-Item -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\Network' -Name 'NewNetworkWindowOff' | Out-Null
 
 
-If ($SMB1 -eq "False")
+# Modify SMB defaults
+If ($SMB1 -eq "True")
 {
     # Disable SMB1:
     Write-Host "Disabling SMB1 Support..." -ForegroundColor Yellow
@@ -750,7 +819,6 @@ If ($SMB1 -eq "False")
     Write-Host ""
     Write-Host ""
 }
-
 
 If ($SMBPerf -eq "True")
 {
@@ -799,18 +867,6 @@ Write-Host ""
 Set-ItemProperty -Path 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize' -Name 'EnableTransparency' -Value '0'
 
 
-# Configure WMI:
-Write-Host "Modifying WMI Configuration..." -ForegroundColor Green
-Write-Host ""
-$oWMI=get-wmiobject -Namespace root -Class __ProviderHostQuotaConfiguration
-$oWMI.MemoryPerHost=768*1024*1024
-$oWMI.MemoryAllHosts=1536*1024*1024
-$oWMI.put()
-Set-ItemProperty -Path HKLM:\SYSTEM\CurrentControlSet\Services\Winmgmt -Name 'Group' -Value 'COM Infrastructure'
-winmgmt /standalonehost
-Write-Host ""
-
-
 # Enable RDP:
 $RDP = Get-WmiObject -Class Win32_TerminalServiceSetting -Namespace root\CIMV2\TerminalServices -Authentication PacketPrivacy
 $Result = $RDP.SetAllowTSConnections($RDPEnable,$RDPFirewallOpen)
@@ -837,7 +893,7 @@ Write-Host ""
 
 
 # Did this break?:
-If ($NoWarn -eq $False)
+If ($NoWarn -ne $True)
 {
     Write-Host "This script has completed." -ForegroundColor Green
     Write-Host ""
