@@ -36,14 +36,15 @@
     .\ConfigWin10asVDI.ps1 -NoWarn $true
 .NOTES
     Author:       Carl Luberti
-    Last Update:  24th August 2016
-    Version:      1.0.5
+    Last Update:  27th October 2016
+    Version:      1.0.6
 .LOG
     1.0.1 - modified sc command to sc.exe to prevent PS from invoking set-content
     1.0.2 - modified UWP Application section to avoid issues with CopyProfile, updated onedrive removal, updated for TH2
     1.0.3 - modified UWP Application section to disable "Consumer Experience" features, modified scheduled tasks to align with 1511 and further version supportability
     1.0.4 - fixed duplicates / issues in service config
     1.0.5 - updated applist for Win10 1607, moved some things out of the critical area (if you've run this before, please review!)
+    1.0.6 - blocked disabling of the Device Association service, disabling service can cause logon delays on domain-joined Win10 1607 systems
 #>
 
 
