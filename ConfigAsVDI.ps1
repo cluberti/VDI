@@ -505,8 +505,10 @@ If ($BranchCache -eq "True")
 Write-Host "Disabling Computer Browser Service..." -ForegroundColor Cyan
 Set-Service Browser -StartupType Disabled
 
-Write-Host "Disabling Device Association Service..." -ForegroundColor Cyan
-Set-Service DeviceAssociationService -StartupType Disabled
+# This service has been found in certain situations to cause logon delays on
+# Windows 10 1607 systems - disabling this service on 1507 or 1511 still works
+#Write-Host "Disabling Device Association Service..." -ForegroundColor Cyan
+#Set-Service DeviceAssociationService -StartupType Disabled
 
 Write-Host "Disabling Device Setup Manager Service..." -ForegroundColor Cyan
 Set-Service DsmSvc -StartupType Disabled
