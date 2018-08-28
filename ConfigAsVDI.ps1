@@ -45,7 +45,7 @@
     1.0.4 - fixed duplicates / issues in service config
     1.0.5 - updated applist for Win10 1607, moved some things out of the critical area (if you've run this before, please review!)
     1.0.6 - blocked disabling of the Device Association service, disabling service can cause logon delays on domain-joined Win10 1607 systems
-    1.0.7 - Changed OneDrive section to remove issues plaguing 1709+ installs
+    1.0.7 - Changed OneDrive section to remove issues plaguing 1709+ installs using Folder Redirection
 #>
 
 
